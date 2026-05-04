@@ -10,7 +10,7 @@
 		"enabled": true
 	},
 	"vars": {
-		"ZULIP_EMAIL": "hello-bot@your-zulip-organization.zulipchat.com",
-		"ZULIP_SITE": "https://your-zulip-organization.zulipchat.com"
+		"ZULIP_EMAIL": "secureblue-bot@secureblue.zulipchat.com",
+		"ZULIP_SITE": "https://secureblue.zulipchat.com"
 	}
 }
