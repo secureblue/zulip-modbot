@@ -7,10 +7,13 @@ from zulip import Client
 from zulip_bots.lib import AbstractBotHandler, ExternalBotHandler, use_storage
 
 MEMBER_GROUP: Final[int] = 1522351
+OWNER_ROLE: Final[int] = 100
+ADMIN_ROLE: Final[int] = 200
+MOD_ROLE: Final[int] = 300
 
 class ModHandler:
     def handle_message(self, message: Dict[str, Any], bot_handler: AbstractBotHandler, client: Client) -> None:
-        mod_roles = {100, 200, 300}
+        mod_roles = {OWNER_ROLE, ADMIN_ROLE, MOD_ROLE}
         sender_email = message['sender_email']
         sender_user = client.call_endpoint(
             url=f"/users/{sender_email}",
@@ -67,7 +70,9 @@ class ModHandler:
                 untimeout_time_s = current_time_s + (timeout_minutes * 60)
                 bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
                 user_full_name = user_to_timeout["user"]["full_name"]
-                response = f"User @**{user_full_name}** ({user_id_to_timeout}) has been timed out until {time.ctime(untimeout_time_s)} UTC."
+                sender_full_name = sender_user["user"]["full_name"]
+                sender_user_id = sender_user["user"]["user_id"]
+                response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
                 bot_handler.send_message(dict(
                     type='stream',
                     to="modlog",
@@ -136,7 +141,7 @@ class Default(WorkerEntrypoint):
 
                 untimedout_user = client.get_user_by_id(user_id)
                 user_full_name = untimedout_user["user"]["full_name"]
-                log_message = f"User @**{user_full_name}** ({user_id}) timeout has been lifted."
+                log_message = f"User @**{user_full_name}|{user_id}** timeout has been lifted."
                 client.send_message(dict(
                     type='stream',
                     to="modlog",
