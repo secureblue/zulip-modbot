@@ -1,10 +1,10 @@
 import time
-from typing import Any, Dict, Optional, Final
+from typing import Any, Final
 from workers import WorkerEntrypoint, Request, Response
 import json
 
 from zulip import Client
-from zulip_bots.lib import AbstractBotHandler, ExternalBotHandler, use_storage
+from zulip_bots.lib import AbstractBotHandler, ExternalBotHandler
 
 TIMEOUT_TOKEN_COUNT: Final[int] = 3
 
@@ -14,7 +14,7 @@ ADMIN_ROLE: Final[int] = 200
 MOD_ROLE: Final[int] = 300
 
 class ModHandler:
-    def handle_message(self, message: Dict[str, Any], bot_handler: AbstractBotHandler, client: Client) -> None:
+    def handle_message(self, message: dict[str, Any], bot_handler: AbstractBotHandler, client: Client) -> None:
         mod_roles = {OWNER_ROLE, ADMIN_ROLE, MOD_ROLE}
         sender_email = message['sender_email']
         sender_user = client.call_endpoint(
@@ -108,16 +108,16 @@ class Default(WorkerEntrypoint):
         )
 
         try:
-            payload: Optional[Dict[str, Any]] = await request.json()
+            payload: dict[str, Any] | None = await request.json()
             if not payload:
                 return Response.json({"error": "Missing request content"}, status=400)
-            message: Dict[str, Any] = payload.get("message")
+            message: dict[str, Any] = payload.get("message")
             if not message:
                 return Response.json({"error": "Missing 'message' in request"}, status=400)
             handler = ModHandler()
             handler.handle_message(message, bot_handler, client)
             return Response(json.dumps({"result": "success"}), status=200)
-            
+
         except Exception as e:
             return Response(json.dumps({"error": str(e)}), status=500)
 
