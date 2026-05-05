@@ -42,48 +42,51 @@ class ModHandler:
         if content.startswith("timeout"):
             content_tokens = content.split()
 
-            if len(content_tokens) == TIMEOUT_TOKEN_COUNT:
-                try:
-                    user_id_to_timeout = int(content_tokens[1])
-                except ValueError:
-                    bot_handler.send_reply(message, "Error: User ID must be a number.")
-                    return
-
-                try:
-                    timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
-                except ValueError:
-                    bot_handler.send_reply(message, "Error: Minutes must be a number.")
-                    return
-
-                user_to_timeout = client.get_user_by_id(user_id_to_timeout)
-                if user_to_timeout["result"] != "success":
-                    bot_handler.send_reply(message, user_to_timeout["msg"])
-                    return
-
-                timeout_request_params = {
-                    "delete": [user_id_to_timeout]
-                }
-                timeout_response = client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
-                if timeout_response["result"] != "success":
-                    bot_handler.send_reply(message, timeout_response["msg"])
-                    return
-
-                current_time_s = int(time.time())
-                untimeout_time_s = current_time_s + timeout_seconds
-                bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
-                user_full_name = user_to_timeout["user"]["full_name"]
-                sender_full_name = sender_user["user"]["full_name"]
-                sender_user_id = sender_user["user"]["user_id"]
-                response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
-                bot_handler.send_message(dict(
-                    type='stream',
-                    to="modlog",
-                    subject="Timeouts",
-                    content=response,
-                ))
-                bot_handler.send_reply(message, response)
-            else:
+            if len(content_tokens) != TIMEOUT_TOKEN_COUNT:
                 bot_handler.send_reply(message, "Usage: `@ModBot timeout <user id> <minutes>`")
+                return
+
+            try:
+                user_id_to_timeout = int(content_tokens[1])
+            except ValueError:
+                bot_handler.send_reply(message, "Error: User ID must be a number.")
+                return
+
+            try:
+                timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
+            except ValueError:
+                bot_handler.send_reply(message, "Error: Minutes must be a number.")
+                return
+
+            user_to_timeout = client.get_user_by_id(user_id_to_timeout)
+            if user_to_timeout["result"] != "success":
+                bot_handler.send_reply(message, user_to_timeout["msg"])
+                return
+
+            timeout_request_params = {
+                "delete": [user_id_to_timeout]
+            }
+            timeout_response = client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
+            if timeout_response["result"] != "success":
+                bot_handler.send_reply(message, timeout_response["msg"])
+                return
+
+            current_time_s = int(time.time())
+            untimeout_time_s = current_time_s + timeout_seconds
+            bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
+
+            user_full_name = user_to_timeout["user"]["full_name"]
+            sender_full_name = sender_user["user"]["full_name"]
+            sender_user_id = sender_user["user"]["user_id"]
+
+            response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
+            bot_handler.send_message(dict(
+                type='stream',
+                to="modlog",
+                subject="Timeouts",
+                content=response,
+            ))
+            bot_handler.send_reply(message, response)
             return
         else:
             content = "Not a valid command. Send \"help\" for usage information."
