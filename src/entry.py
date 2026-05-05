@@ -6,6 +6,8 @@ import json
 from zulip import Client
 from zulip_bots.lib import AbstractBotHandler, ExternalBotHandler, use_storage
 
+TIMEOUT_TOKEN_COUNT: Final[int] = 3
+
 MEMBER_GROUP: Final[int] = 1522351
 OWNER_ROLE: Final[int] = 100
 ADMIN_ROLE: Final[int] = 200
@@ -40,7 +42,7 @@ class ModHandler:
         if content.startswith("timeout"):
             content_tokens = content.split()
 
-            if len(content_tokens) == 3:
+            if len(content_tokens) == TIMEOUT_TOKEN_COUNT:
                 try:
                     user_id_to_timeout = int(content_tokens[1])
                 except ValueError:
@@ -48,7 +50,7 @@ class ModHandler:
                     return
 
                 try:
-                    timeout_minutes = int(content_tokens[2])
+                    timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
                 except ValueError:
                     bot_handler.send_reply(message, "Error: Minutes must be a number.")
                     return
@@ -67,7 +69,7 @@ class ModHandler:
                     return
 
                 current_time_s = int(time.time())
-                untimeout_time_s = current_time_s + (timeout_minutes * 60)
+                untimeout_time_s = current_time_s + timeout_seconds
                 bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
                 user_full_name = user_to_timeout["user"]["full_name"]
                 sender_full_name = sender_user["user"]["full_name"]
@@ -124,7 +126,7 @@ class Default(WorkerEntrypoint):
         client = self._get_client()
         timeout_data = client.get_storage()["storage"]
         user_groups = client.get_user_groups()["user_groups"]
-        member_group = next((group for group in user_groups if group["id"] == 1522351), None)
+        member_group = next((group for group in user_groups if group["id"] == MEMBER_GROUP), None)
         if not member_group:
             raise Exception("Member group not found.")
 
