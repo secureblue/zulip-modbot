@@ -14,10 +14,14 @@ ADMIN_ROLE: Final[int] = 200
 MOD_ROLE: Final[int] = 300
 
 class ModHandler:
-    def handle_message(self, message: dict[str, Any], bot_handler: AbstractBotHandler, client: Client) -> None:
+    bot_handler: AbstractBotHandler
+    client: Client
+
+    def handle_message(self, message: dict[str, Any]) -> None:
+        bot_handler = self.bot_handler
         mod_roles = {OWNER_ROLE, ADMIN_ROLE, MOD_ROLE}
         sender_email = message['sender_email']
-        sender_user = client.call_endpoint(
+        sender_user: dict[str, Any] = self.client.call_endpoint(
             url=f"/users/{sender_email}",
             method="GET",
         )
@@ -34,14 +38,14 @@ class ModHandler:
         )
 
         content = message["content"].removeprefix("@**ModBot**").strip()
+        content_tokens = content.split()
+
         if content == "help":
             bot_handler.send_reply(message, help_str)
             bot_handler.react(message, "thinking")
             return
 
         if content.startswith("timeout"):
-            content_tokens = content.split()
-
             if len(content_tokens) != TIMEOUT_TOKEN_COUNT:
                 bot_handler.send_reply(message, "Usage: `@ModBot timeout <user id> <minutes>`")
                 return
@@ -58,7 +62,7 @@ class ModHandler:
                 bot_handler.send_reply(message, "Error: Minutes must be a number.")
                 return
 
-            user_to_timeout = client.get_user_by_id(user_id_to_timeout)
+            user_to_timeout = self.client.get_user_by_id(user_id_to_timeout)
             if user_to_timeout["result"] != "success":
                 bot_handler.send_reply(message, user_to_timeout["msg"])
                 return
@@ -66,7 +70,7 @@ class ModHandler:
             timeout_request_params = {
                 "delete": [user_id_to_timeout]
             }
-            timeout_response = client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
+            timeout_response = self.client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
             if timeout_response["result"] != "success":
                 bot_handler.send_reply(message, timeout_response["msg"])
                 return
@@ -117,8 +121,8 @@ class Default(WorkerEntrypoint):
             message: dict[str, Any] = payload.get("message")
             if not message:
                 return Response.json({"error": "Missing 'message' in request"}, status=400)
-            handler = ModHandler()
-            handler.handle_message(message, bot_handler, client)
+            handler = ModHandler(bot_handler, client)
+            handler.handle_message(message)
             return Response(json.dumps({"result": "success"}), status=200)
 
         except Exception as e:
