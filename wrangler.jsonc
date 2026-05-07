@@ -7,6 +7,7 @@
 		"python_workers"
 	],
   	"observability": {
+    	"enabled": true,
 		"logs": {
 			"enabled": true,
 			"invocation_logs": true
