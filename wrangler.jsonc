@@ -6,9 +6,16 @@
 	"compatibility_flags": [
 		"python_workers"
 	],
-	"observability": {
-		"enabled": true
+  	"observability": {
+    		"logs": {
+      			"enabled": true,
+      			"invocation_logs": true
+    		},
+    		"traces": {
+			"enabled": false
+		}
 	},
+
 	"vars": {
 		"ZULIP_EMAIL": "secureblue-bot@secureblue.zulipchat.com",
 		"ZULIP_SITE": "https://secureblue.zulipchat.com"
