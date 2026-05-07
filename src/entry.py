@@ -61,7 +61,7 @@ class ModHandler:
                     bot_handler.send_reply(message, user_to_timeout["msg"])
                     return
 
-               if user_to_timeout["user"]["role"] in mod_roles or user_to_timeout["user"]["user_id"] == MODBOT_USER:
+                if user_to_timeout["user"]["role"] in mod_roles or user_to_timeout["user"]["user_id"] == MODBOT_USER:
                     bot_handler.send_reply(message, "User is immune to timeouts.")
                     return
 
