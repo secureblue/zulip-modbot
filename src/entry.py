@@ -12,6 +12,7 @@ MEMBER_GROUP: Final[int] = 1522351
 OWNER_ROLE: Final[int] = 100
 ADMIN_ROLE: Final[int] = 200
 MOD_ROLE: Final[int] = 300
+MODBOT_USER: Final[int] = 1028937
 
 class ModHandler:
     def handle_message(self, message: dict[str, Any], bot_handler: AbstractBotHandler, client: Client) -> None:
@@ -58,6 +59,10 @@ class ModHandler:
                 user_to_timeout = client.get_user_by_id(user_id_to_timeout)
                 if user_to_timeout["result"] != "success":
                     bot_handler.send_reply(message, user_to_timeout["msg"])
+                    return
+
+               if user_to_timeout["user"]["role"] in mod_roles or user_to_timeout["user"]["user_id"] == MODBOT_USER:
+                    bot_handler.send_reply(message, "User is immune to timeouts.")
                     return
 
                 timeout_request_params = {
@@ -133,7 +138,7 @@ class Default(WorkerEntrypoint):
         member_group_members = member_group["members"]
         current_time_ms = int(time.time())
         for user_id in timeout_data:
-            if user_id not in member_group_members and int(timeout_data[user_id]) < current_time_ms:
+            if int(user_id) not in member_group_members and int(timeout_data[user_id]) < current_time_ms:
                 untimeout_request_params = {
                     "add": [int(user_id)]
                 }
