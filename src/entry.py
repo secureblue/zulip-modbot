@@ -61,8 +61,9 @@ class ModHandler:
                     bot_handler.send_reply(message, user_to_timeout["msg"])
                     return
 
+                user_full_name = user_to_timeout["user"]["full_name"]
                 if user_to_timeout["user"]["role"] in mod_roles or user_to_timeout["user"]["user_id"] == MODBOT_USER:
-                    bot_handler.send_reply(message, "User is immune to timeouts.")
+                    bot_handler.send_reply(message, f"User @**{user_full_name}|{user_id_to_timeout}** is immune to timeouts.")
                     return
 
                 timeout_request_params = {
@@ -76,7 +77,6 @@ class ModHandler:
                 current_time_s = int(time.time())
                 untimeout_time_s = current_time_s + timeout_seconds
                 bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
-                user_full_name = user_to_timeout["user"]["full_name"]
                 sender_full_name = sender_user["user"]["full_name"]
                 sender_user_id = sender_user["user"]["user_id"]
                 response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
