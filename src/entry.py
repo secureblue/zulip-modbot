@@ -13,20 +13,19 @@ OWNER_ROLE: Final[int] = 100
 ADMIN_ROLE: Final[int] = 200
 MOD_ROLE: Final[int] = 300
 MODBOT_USER: Final[int] = 1028937
+MOD_ROLES: Final[set[int]] = {OWNER_ROLE, ADMIN_ROLE, MOD_ROLE}
 
 class ModHandler:
     def handle_message(self, message: dict[str, Any], bot_handler: AbstractBotHandler, client: Client) -> None:
-        mod_roles = {OWNER_ROLE, ADMIN_ROLE, MOD_ROLE}
         sender_email = message['sender_email']
         sender_user = client.call_endpoint(
             url=f"/users/{sender_email}",
             method="GET",
         )
 
-        if sender_user["user"]["role"] not in mod_roles:
+        if sender_user["user"]["role"] not in MOD_ROLES:
             bot_handler.send_reply(message, "You are not authorized to use ModBot.")
             return
-
 
         help_str = (
             "Use this bot with any of the following commands:"
@@ -41,60 +40,61 @@ class ModHandler:
             return
 
         if content.startswith("timeout"):
-            content_tokens = content.split()
-
-            if len(content_tokens) == TIMEOUT_TOKEN_COUNT:
-                try:
-                    user_id_to_timeout = int(content_tokens[1])
-                except ValueError:
-                    bot_handler.send_reply(message, "Error: User ID must be a number.")
-                    return
-
-                try:
-                    timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
-                except ValueError:
-                    bot_handler.send_reply(message, "Error: Minutes must be a number.")
-                    return
-
-                user_to_timeout = client.get_user_by_id(user_id_to_timeout)
-                if user_to_timeout["result"] != "success":
-                    bot_handler.send_reply(message, user_to_timeout["msg"])
-                    return
-
-                user_full_name = user_to_timeout["user"]["full_name"]
-                if user_to_timeout["user"]["role"] in mod_roles or user_to_timeout["user"]["user_id"] == MODBOT_USER:
-                    bot_handler.send_reply(message, f"User @**{user_full_name}|{user_id_to_timeout}** is immune to timeouts.")
-                    return
-
-                timeout_request_params = {
-                    "delete": [user_id_to_timeout]
-                }
-                timeout_response = client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
-                if timeout_response["result"] != "success":
-                    bot_handler.send_reply(message, timeout_response["msg"])
-                    return
-
-                current_time_s = int(time.time())
-                untimeout_time_s = current_time_s + timeout_seconds
-                bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
-                sender_full_name = sender_user["user"]["full_name"]
-                sender_user_id = sender_user["user"]["user_id"]
-                response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
-                bot_handler.send_message(dict(
-                    type='stream',
-                    to="modlog",
-                    subject="Timeouts",
-                    content=response,
-                ))
-                bot_handler.send_reply(message, response)
-            else:
-                bot_handler.send_reply(message, "Usage: `@ModBot timeout <user id> <minutes>`")
-            return
+            self._handle_timeout()
         else:
             content = "Not a valid command. Send \"help\" for usage information."
             bot_handler.send_reply(message, content)
             bot_handler.react(message, "interrobang")
 
+    def _handle_timeout(self, content: str, bot_handler: AbstractBotHandler, client: Client) -> None:
+        content_tokens = content.split()
+
+        if len(content_tokens) == TIMEOUT_TOKEN_COUNT:
+            try:
+                user_id_to_timeout = int(content_tokens[1])
+            except ValueError:
+                bot_handler.send_reply(message, "Error: User ID must be a number.")
+                return
+
+            try:
+                timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
+            except ValueError:
+                bot_handler.send_reply(message, "Error: Minutes must be a number.")
+                return
+
+            user_to_timeout = client.get_user_by_id(user_id_to_timeout)
+            if user_to_timeout["result"] != "success":
+                bot_handler.send_reply(message, user_to_timeout["msg"])
+                return
+
+            user_full_name = user_to_timeout["user"]["full_name"]
+            if user_to_timeout["user"]["role"] in MOD_ROLES or user_to_timeout["user"]["user_id"] == MODBOT_USER:
+                bot_handler.send_reply(message, f"User @**{user_full_name}|{user_id_to_timeout}** is immune to timeouts.")
+                return
+
+            timeout_request_params = {
+                "delete": [user_id_to_timeout]
+            }
+            timeout_response = client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
+            if timeout_response["result"] != "success":
+                bot_handler.send_reply(message, timeout_response["msg"])
+                return
+
+            current_time_s = int(time.time())
+            untimeout_time_s = current_time_s + timeout_seconds
+            bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
+            sender_full_name = sender_user["user"]["full_name"]
+            sender_user_id = sender_user["user"]["user_id"]
+            response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
+            bot_handler.send_message(dict(
+                type='stream',
+                to="modlog",
+                subject="Timeouts",
+                content=response,
+            ))
+            bot_handler.send_reply(message, response)
+        else:
+            bot_handler.send_reply(message, "Usage: `@ModBot timeout <user id> <minutes>`")
 
 class Default(WorkerEntrypoint):
     def _get_client(self):
