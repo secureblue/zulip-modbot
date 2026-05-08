@@ -20,7 +20,7 @@ class ModHandler:
         sender_user = self._get_sender_user(message, client)
         if not self._check_authorized(message, sender_user, bot_handler):
             return
-        
+
         content = message["content"].removeprefix("@**ModBot**").strip()
         if content == "help":
             self._handle_help(message, bot_handler)
@@ -61,16 +61,41 @@ class ModHandler:
         if len(content_tokens) != TIMEOUT_TOKEN_COUNT:
             bot_handler.send_reply(message, "Usage: `@ModBot timeout <user id> <minutes>`")
             return False
-        
+
         if not content_tokens[1].isdigit():
             bot_handler.send_reply(message, "Error: User ID must be a number.")
             return False
-        
+
         if not content_tokens[2].isdigit():
             bot_handler.send_reply(message, "Error: Minutes must be a number.")
             return False
-        
+
         return True
+
+    def _handle_timeout(
+            self,
+            message: dict[str, Any],
+            content: str,
+            sender_user: dict[str, Any],
+            bot_handler: AbstractBotHandler,
+            client: Client
+    ) -> None:
+        content_tokens = content.split()
+        if not self._validate_content_tokens(message, content_tokens, bot_handler):
+            return
+
+        user_id_to_timeout = int(content_tokens[1])
+        user_to_timeout = client.get_user_by_id(user_id_to_timeout)
+        if user_to_timeout["result"] != "success":
+            bot_handler.send_reply(message, user_to_timeout["msg"])
+            return
+
+        user_full_name = user_to_timeout["user"]["full_name"]
+        if user_to_timeout["user"]["role"] in MOD_ROLES or user_to_timeout["user"]["user_id"] == MODBOT_USER:
+            bot_handler.send_reply(message, f"User @**{user_full_name}|{user_id_to_timeout}** is immune to timeouts.")
+            return
+
+        self._timeout_user(message, sender_user, user_full_name, content_tokens, user_id_to_timeout, bot_handler, client)
 
     def _timeout_user(
             self,
@@ -106,30 +131,6 @@ class ModHandler:
         ))
         bot_handler.send_reply(message, response)
 
-    def _handle_timeout(
-            self,
-            message: dict[str, Any],
-            content: str,
-            sender_user: dict[str, Any],
-            bot_handler: AbstractBotHandler,
-            client: Client
-    ) -> None:
-        content_tokens = content.split()
-        if not self._validate_content_tokens(message, content_tokens, bot_handler):
-            return
-        
-        user_id_to_timeout = int(content_tokens[1])
-        user_to_timeout = client.get_user_by_id(user_id_to_timeout)
-        if user_to_timeout["result"] != "success":
-            bot_handler.send_reply(message, user_to_timeout["msg"])
-            return
-
-        user_full_name = user_to_timeout["user"]["full_name"]
-        if user_to_timeout["user"]["role"] in MOD_ROLES or user_to_timeout["user"]["user_id"] == MODBOT_USER:
-            bot_handler.send_reply(message, f"User @**{user_full_name}|{user_id_to_timeout}** is immune to timeouts.")
-            return
-
-        self._timeout_user(message, sender_user, user_full_name, content_tokens, user_id_to_timeout, bot_handler, client)
 
 class Default(WorkerEntrypoint):
     def _get_client(self):
