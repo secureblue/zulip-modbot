@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 from typing import Any, Final
 from workers import WorkerEntrypoint, Request, Response
 import json
@@ -15,20 +16,25 @@ MOD_ROLE: Final[int] = 300
 MODBOT_USER: Final[int] = 1028937
 MOD_ROLES: Final[set[int]] = {OWNER_ROLE, ADMIN_ROLE, MOD_ROLE}
 
+
+@dataclass(frozen=True, slots=True)
 class ModHandler:
-    def handle_message(self, message: dict[str, Any], bot_handler: AbstractBotHandler, client: Client) -> str:
-        sender_user = self._get_sender_user(message, client)
-        if not self._check_authorized(message, sender_user, bot_handler):
+    bot_handler: AbstractBotHandler
+    client: Client
+
+    def handle_message(self, message: dict[str, Any]) -> str:
+        sender_user = self._get_sender_user(message, self.client)
+        if not self._check_authorized(message, sender_user):
             return "You are not authorized to use ModBot."
 
         content = message["content"].removeprefix("@**ModBot**").strip()
         if content == "help":
-            return self._handle_help(message, bot_handler)
+            return self._handle_help(message)
 
         if content.startswith("timeout"):
-            return self._handle_timeout(message, content, sender_user, bot_handler, client)
+            return self._handle_timeout(message, content, sender_user)
 
-        bot_handler.react(message, "interrobang")
+        self.bot_handler.react(message, "interrobang")
         return "Not a valid command. Send \"help\" for usage information."
 
     def _get_sender_user(self, message: dict[str, Any], client: Client) -> dict[str, Any]:
@@ -39,15 +45,15 @@ class ModHandler:
         )
         return sender_user
 
-    def _handle_help(self, message: dict[str, Any], bot_handler: AbstractBotHandler) -> str:
-        bot_handler.react(message, "thinking")
+    def _handle_help(self, message: dict[str, Any]) -> str:
+        self.bot_handler.react(message, "thinking")
         return (
             "Use this bot with any of the following commands:"
             "\n* `@ModBot timeout <userid> <minutes>` : Timeout a user by user id for a specified number of minutes"
             "\n* `@ModBot help` : Display help message"
         )
 
-    def _check_authorized(self, message: dict[str, Any], sender_user: dict[str, Any], bot_handler: AbstractBotHandler) -> bool:
+    def _check_authorized(self, message: dict[str, Any], sender_user: dict[str, Any]) -> bool:
         if sender_user["user"]["role"] not in MOD_ROLES:
             return False
         else:
@@ -70,8 +76,6 @@ class ModHandler:
             message: dict[str, Any],
             content: str,
             sender_user: dict[str, Any],
-            bot_handler: AbstractBotHandler,
-            client: Client
     ) -> str:
         content_tokens = content.split()
         tokens_are_invalid = self._validate_content_tokens(message, content_tokens)
@@ -79,7 +83,7 @@ class ModHandler:
             return tokens_are_invalid
 
         user_id_to_timeout = int(content_tokens[1])
-        user_to_timeout = client.get_user_by_id(user_id_to_timeout)
+        user_to_timeout = self.client.get_user_by_id(user_id_to_timeout)
         if user_to_timeout["result"] != "success":
             return user_to_timeout["msg"]
 
@@ -87,7 +91,7 @@ class ModHandler:
         if user_to_timeout["user"]["role"] in MOD_ROLES or user_to_timeout["user"]["user_id"] == MODBOT_USER:
             return f"User @**{user_full_name}|{user_id_to_timeout}** is immune to timeouts."
 
-        return self._timeout_user(message, sender_user, user_full_name, content_tokens, user_id_to_timeout, bot_handler, client)
+        return self._timeout_user(message, sender_user, user_full_name, content_tokens, user_id_to_timeout)
 
     def _timeout_user(
             self,
@@ -96,25 +100,23 @@ class ModHandler:
             user_full_name: str,
             content_tokens: list[str],
             user_id_to_timeout: int,
-            bot_handler: AbstractBotHandler,
-            client: Client
     ) -> str:
         timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
         timeout_request_params = {
             "delete": [user_id_to_timeout]
         }
-        timeout_response = client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
+        timeout_response = self.client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
         if timeout_response["result"] != "success":
             return timeout_response["msg"]
 
         current_time_s = int(time.time())
         untimeout_time_s = current_time_s + timeout_seconds
-        bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
+        self.bot_handler.storage.put(str(user_id_to_timeout), untimeout_time_s)
 
         sender_full_name = sender_user["user"]["full_name"]
         sender_user_id = sender_user["user"]["user_id"]
         response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
-        bot_handler.send_message(dict(
+        self.bot_handler.send_message(dict(
             type='stream',
             to="modlog",
             subject="Timeouts",
@@ -146,8 +148,8 @@ class Default(WorkerEntrypoint):
             message: dict[str, Any] = payload.get("message")
             if not message:
                 return Response.json({"error": "Missing 'message' in request"}, status=400)
-            handler = ModHandler()
-            reply_str = handler.handle_message(message, bot_handler, client)
+            handler = ModHandler(bot_handler, client)
+            reply_str = handler.handle_message(message)
             bot_handler.send_reply(message, reply_str)
             return Response(json.dumps({"result": "success"}), status=200)
 
