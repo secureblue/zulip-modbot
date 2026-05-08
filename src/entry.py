@@ -32,7 +32,7 @@ class ModHandler:
             return self._handle_help(message)
 
         if content.startswith("timeout"):
-            return self._handle_timeout(message, content, sender_user)
+            return self._validate_timeout(message, content, sender_user)
 
         self.bot_handler.react(message, "interrobang")
         return "Not a valid command. Send \"help\" for usage information."
@@ -59,7 +59,14 @@ class ModHandler:
         else:
             return True
 
-    def _validate_content_tokens(self, message: dict[str, Any], content_tokens: list[str]) -> str | None:
+    def _validate_timeout(
+        self,
+        message: dict[str, Any],
+        content: str,
+        sender_user: dict[str, Any],
+    ) -> str:
+        content_tokens = content.split()
+
         if len(content_tokens) != TIMEOUT_TOKEN_COUNT:
             return "Usage: `@ModBot timeout <user id> <minutes>`"
 
@@ -68,19 +75,6 @@ class ModHandler:
 
         if not content_tokens[2].isdigit():
             return "Error: Minutes must be a number."
-
-        return None
-
-    def _handle_timeout(
-            self,
-            message: dict[str, Any],
-            content: str,
-            sender_user: dict[str, Any],
-    ) -> str:
-        content_tokens = content.split()
-        tokens_are_invalid = self._validate_content_tokens(message, content_tokens)
-        if tokens_are_invalid:
-            return tokens_are_invalid
 
         user_id_to_timeout = int(content_tokens[1])
         user_to_timeout = self.client.get_user_by_id(user_id_to_timeout)
@@ -94,12 +88,12 @@ class ModHandler:
         return self._timeout_user(message, sender_user, user_full_name, content_tokens, user_id_to_timeout)
 
     def _timeout_user(
-            self,
-            message: dict[str, Any],
-            sender_user: dict[str, Any],
-            user_full_name: str,
-            content_tokens: list[str],
-            user_id_to_timeout: int,
+        self,
+        message: dict[str, Any],
+        sender_user: dict[str, Any],
+        user_full_name: str,
+        content_tokens: list[str],
+        user_id_to_timeout: int,
     ) -> str:
         timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
         timeout_request_params = {
