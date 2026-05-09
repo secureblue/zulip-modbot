@@ -28,11 +28,13 @@ class ModHandler:
             return "You are not authorized to use ModBot."
 
         content = message["content"].removeprefix("@**ModBot**").strip()
+        content_tokens = content.split()
+
         if content == "help":
             return self._handle_help(message)
 
         if content.startswith("timeout"):
-            return self._validate_timeout(message, content, sender_user)
+            return self._validate_timeout(message, content_tokens, sender_user)
 
         self.bot_handler.react(message, "interrobang")
         return "Not a valid command. Send \"help\" for usage information."
@@ -62,21 +64,19 @@ class ModHandler:
     def _validate_timeout(
         self,
         message: dict[str, Any],
-        content: str,
+        tokens: list[str],
         sender_user: dict[str, Any],
     ) -> str:
-        content_tokens = content.split()
-
-        if len(content_tokens) != TIMEOUT_TOKEN_COUNT:
+        if len(tokens) != TIMEOUT_TOKEN_COUNT:
             return "Usage: `@ModBot timeout <user id> <minutes>`"
 
-        if not content_tokens[1].isdigit():
+        if not tokens[1].isdigit():
             return "Error: User ID must be a number."
 
-        if not content_tokens[2].isdigit():
+        if not tokens[2].isdigit():
             return "Error: Minutes must be a number."
 
-        user_id_to_timeout = int(content_tokens[1])
+        user_id_to_timeout = int(tokens[1])
         user_to_timeout = self.client.get_user_by_id(user_id_to_timeout)
         if user_to_timeout["result"] != "success":
             return user_to_timeout["msg"]
@@ -85,17 +85,17 @@ class ModHandler:
         if user_to_timeout["user"]["role"] in MOD_ROLES or user_to_timeout["user"]["user_id"] == MODBOT_USER:
             return f"User @**{user_full_name}|{user_id_to_timeout}** is immune to timeouts."
 
-        return self._timeout_user(message, sender_user, user_full_name, content_tokens, user_id_to_timeout)
+        timeout_seconds = int(tokens[2]) * 60  # given in minutes
+        return self._timeout_user(message, sender_user, user_full_name, timeout_seconds, user_id_to_timeout)
 
     def _timeout_user(
         self,
         message: dict[str, Any],
         sender_user: dict[str, Any],
         user_full_name: str,
-        content_tokens: list[str],
+        timeout_seconds: int,
         user_id_to_timeout: int,
     ) -> str:
-        timeout_seconds = int(content_tokens[2]) * 60 # given in minutes
         timeout_request_params = {
             "delete": [user_id_to_timeout]
         }
