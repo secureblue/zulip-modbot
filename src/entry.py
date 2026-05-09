@@ -160,22 +160,26 @@ class Default(WorkerEntrypoint):
             raise Exception("Member group not found.")
 
         member_group_members = member_group["members"]
-        current_time_ms = int(time.time())
+        current_time_s = int(time.time())
         for user_id in timeout_data:
-            if int(user_id) not in member_group_members and int(timeout_data[user_id]) < current_time_ms:
-                untimeout_request_params = {
-                    "add": [int(user_id)]
-                }
-                untimeout_response = client.update_user_group_members(MEMBER_GROUP, untimeout_request_params)
-                if untimeout_response["result"] != "success":
-                    raise Exception(untimeout_response["msg"])
+            not_timed_out = int(user_id) in member_group_members
+            timeout_sill_active = int(timeout_data[user_id]) > current_time_s
+            if not_timed_out or timeout_sill_active:
+                return
 
-                untimedout_user = client.get_user_by_id(user_id)
-                user_full_name = untimedout_user["user"]["full_name"]
-                log_message = f"User @**{user_full_name}|{user_id}** timeout has been lifted."
-                client.send_message(dict(
-                    type='stream',
-                    to="modlog",
-                    subject="Timeouts",
-                    content=log_message,
-                ))
+            untimeout_request_params = {
+                "add": [int(user_id)]
+            }
+            untimeout_response = client.update_user_group_members(MEMBER_GROUP, untimeout_request_params)
+            if untimeout_response["result"] != "success":
+                raise Exception(untimeout_response["msg"])
+
+            untimedout_user = client.get_user_by_id(user_id)
+            user_full_name = untimedout_user["user"]["full_name"]
+            log_message = f"User @**{user_full_name}|{user_id}** timeout has been lifted."
+            client.send_message(dict(
+                type='stream',
+                to="modlog",
+                subject="Timeouts",
+                content=log_message,
+            ))
