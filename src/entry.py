@@ -37,7 +37,7 @@ class ModHandler:
             return self._validate_timeout(message, content_tokens, sender_user)
 
         self.bot_handler.react(message, "interrobang")
-        return "Not a valid command. Send \"help\" for usage information."
+        return 'Not a valid command. Send "help" for usage information.'
 
     def _get_sender_user(self, message: dict[str, Any], client: Client) -> dict[str, Any]:
         sender_email = message['sender_email']
@@ -96,12 +96,11 @@ class ModHandler:
         timeout_seconds: int,
         user_id_to_timeout: int,
     ) -> str:
-        timeout_request_params = {
-            "delete": [user_id_to_timeout]
-        }
-        timeout_response = self.client.update_user_group_members(MEMBER_GROUP, timeout_request_params)
+        timeout_response = self.client.update_user_group_members(
+            MEMBER_GROUP, {"delete": [user_id_to_timeout]}
+        )
         if timeout_response["result"] != "success":
-            return timeout_response["msg"]
+            return str(timeout_response["msg"])
 
         current_time_s = int(time.time())
         untimeout_time_s = current_time_s + timeout_seconds
@@ -109,18 +108,18 @@ class ModHandler:
 
         sender_full_name = sender_user["user"]["full_name"]
         sender_user_id = sender_user["user"]["user_id"]
-        response = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
+        reply_str = f"User @**{user_full_name}|{user_id_to_timeout}** has been timed out by @**{sender_full_name}|{sender_user_id}** until {time.ctime(untimeout_time_s)} UTC."
         self.bot_handler.send_message(dict(
             type='stream',
             to="modlog",
             subject="Timeouts",
-            content=response,
+            content=reply_str,
         ))
-        return response
+        return reply_str
 
 
 class Default(WorkerEntrypoint):
-    def _get_client(self):
+    def _get_client(self) -> Client:
         return Client(
             email=self.env.ZULIP_EMAIL,
             api_key=self.env.ZULIP_API_KEY,
@@ -147,16 +146,16 @@ class Default(WorkerEntrypoint):
             message: dict[str, Any] | None = payload.get("message")
             if not message:
                 return respond(400, "Missing 'message' in request")
+
             mod_handler = ModHandler(bot_handler, client)
             reply_str = mod_handler.handle_message(message)
             bot_handler.send_reply(message, reply_str)
             return respond(200)
-
         except Exception as e:
             return respond(500, str(e))
 
 
-    async def scheduled(self, controller, env, ctx):
+    async def scheduled(self, controller: Any, env: Any, ctx: Any) -> None:
         client = self._get_client()
         timeout_data = client.get_storage()["storage"]
         user_groups = client.get_user_groups()["user_groups"]
