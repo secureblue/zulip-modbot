@@ -135,20 +135,25 @@ class Default(WorkerEntrypoint):
             bot_details={"name": "ModBot"}
         )
 
+        def respond(status_code: int, message: str = "") -> Response:
+            result = "success" if status_code == 200 else "error"
+            json_str = json.dumps({ "result": result, "msg": message })
+            return Response(json_str, status=status_code)
+
         try:
             payload: dict[str, Any] | None = await request.json()
             if not payload:
-                return Response.json({"error": "Missing request content"}, status=400)
-            message: dict[str, Any] = payload.get("message")
+                return respond(400, "Missing request content")
+            message: dict[str, Any] | None = payload.get("message")
             if not message:
-                return Response.json({"error": "Missing 'message' in request"}, status=400)
-            handler = ModHandler(bot_handler, client)
-            reply_str = handler.handle_message(message)
+                return respond(400, "Missing 'message' in request")
+            mod_handler = ModHandler(bot_handler, client)
+            reply_str = mod_handler.handle_message(message)
             bot_handler.send_reply(message, reply_str)
-            return Response(json.dumps({"result": "success"}), status=200)
+            return respond(200)
 
         except Exception as e:
-            return Response(json.dumps({"error": str(e)}), status=500)
+            return respond(500, str(e))
 
 
     async def scheduled(self, controller, env, ctx):
